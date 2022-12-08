@@ -25,7 +25,7 @@ Step 2. Add the dependency
 
 ```kotlin
 dependencies {
-    implementation 'io.github.omkar-tenkale:ktor-role-based-auth:<VERSION>'
+    implementation("com.github.omkar-tenkale:ktor-role-based-auth:0.1.0")
 }
 ```
 
