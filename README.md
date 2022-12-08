@@ -32,11 +32,11 @@ dependencies {
 
 ## Usage
 
-Initialize when setting up application
+Initialize when setting up application, tell the plugin how to extract roles from a principal
 ```kotlin
 fun Application.module(){
     installRoleBasedAuthPlugin{
-        extractRoles{ call ->
+        extractRoles{ principal ->
             //Return roles for this request
             //For example in JWT authentication retrieve roles from jwt payload
             (principal as JWTPrincipal).payload.claims?.get("roles")?.asList(String::class.java)?.toSet() ?: emptySet()
@@ -44,6 +44,7 @@ fun Application.module(){
     }
 }
 ```
+Then you can authorize any route like:
 ```kotlin
 fun Application.routing() {
     route("/posts/") {
@@ -51,6 +52,7 @@ fun Application.routing() {
             call.respondText("Any user can access this route")
         }
         method(HttpMethod.Post) {
+            //Also available: withAllRoles(), withoutRoles() and withAnyRole()
             withRole("admin") {
                 call.respondText("Only user with admin role can access this route, others will get a HTTP 403 (Forbidden) response")
             }
@@ -58,3 +60,6 @@ fun Application.routing() {
     }
 }
 ```
+
+## Thanks
+- [Joris Portegies Zwart](https://github.com/ximedes/ktor-authorization) - Original implementation with pipelines and phases for older ktor versions
