@@ -1,3 +1,6 @@
+> UPDATE: Read official announcement for role based auth in [Ktor 2023 roadmap](https://blog.jetbrains.com/ktor/2022/12/16/ktor-2023-roadmap/)      
+> Simplifying support for authorization and authentication. Providing end-to-end support for database authentication and session management, as well as role-based authorization
+
 # Ktor Role based Auth
 [![](https://jitpack.io/v/omkar-tenkale/ktor-role-based-auth.svg)](https://jitpack.io/#omkar-tenkale/ktor-role-based-auth)
 
