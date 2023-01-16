@@ -20,11 +20,12 @@ Supported methods
 
 ## Installation
 
-Step 1. Add the JitPack repository
+Step 1. Add the JitPack repository in `build.gradle.kts`
 
 ```kotlin
 repositories {
-    maven { url "https://jitpack.io" }
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
 }
 ```
 
