@@ -129,7 +129,7 @@ fun Application.configureSecurity() {
 ```
 
 
-For complete example, Check out [tests](src/test/kotlin/io/github/omkartenkale/ktor_role_based_aut/RoleBasedAuthPluginTest.kt)
+For complete example, Check out [tests](src/test/kotlin/io/github/omkartenkale/ktor_role_based_auth/RoleBasedAuthPluginTest.kt)
 
 ## Thanks
 - [Joris Portegies Zwart](https://github.com/ximedes/ktor-authorization) - Original implementation with pipelines and phases for older ktor versions
