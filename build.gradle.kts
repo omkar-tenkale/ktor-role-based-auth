@@ -6,24 +6,25 @@ plugins {
 }
 
 group = "io.github.omkar-tenkale"
-version = "0.1.0"
+version = "0.2.0"
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-
-    val ktorVersion = "2.1.3"
-    implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-server-webjars:$ktorVersion")
-    implementation("io.ktor:ktor-server-auth:$ktorVersion")
-    implementation("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-    testImplementation("io.ktor:ktor-serialization-jackson:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-auth:$ktorVersion")
-    testImplementation("io.ktor:ktor-server-call-logging:$ktorVersion")
+    val ktor_version = "2.2.1"
+    implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-webjars:$ktor_version")
+    implementation("io.ktor:ktor-server-auth:$ktor_version")
+    testImplementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
+    testImplementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
+    implementation("io.ktor:ktor-server-status-pages:$ktor_version")
+    testImplementation("io.ktor:ktor-serialization-jackson:$ktor_version")
+    testImplementation("io.ktor:ktor-server-auth:$ktor_version")
+    testImplementation("io.ktor:ktor-server-call-logging:$ktor_version")
+    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.8.1")
 }
 
 tasks.test {

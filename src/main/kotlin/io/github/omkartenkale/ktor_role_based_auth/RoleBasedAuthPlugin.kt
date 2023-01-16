@@ -6,92 +6,114 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 
 typealias Role = String
-
-class RoleBasedAuthConfiguration(
-    var any: Set<Role>? = null,
-    var all: Set<Role>? = null,
-    var none: Set<Role>? = null,
-)
-
-fun Route.withRole(role: Role, build: suspend PipelineContext<Unit, ApplicationCall>.() -> Unit) =
-    withAnyRole(setOf(role), build)
-
-fun Route.withAllRoles(roles: Set<Role>, build: suspend PipelineContext<Unit, ApplicationCall>.() -> Unit) {
-    install(RoleBasedAuthPlugin) {
-        all = roles.toSet()
-    }
-    handle { build() }
+class RoleBasedAuthConfiguration {
+    var requiredRoles: Set<String> = emptySet()
+    lateinit var authType: AuthType
 }
-
-fun Route.withoutRoles(roles: Set<Role>, build: suspend PipelineContext<Unit, ApplicationCall>.() -> Unit) {
-    install(RoleBasedAuthPlugin) {
-        none = roles.toSet()
-    }
-    handle { build() }
+enum class AuthType {
+    ALL,
+    ANY,
+    NONE,
 }
+class AuthorizedRouteSelector(private val description: String) : RouteSelector() {
+    override fun evaluate(context: RoutingResolveContext, segmentIndex: Int) = RouteSelectorEvaluation.Constant
 
-fun Route.withAnyRole(roles: Set<Role>, build: suspend PipelineContext<Unit, ApplicationCall>.() -> Unit) {
-    install(RoleBasedAuthPlugin) {
-        any = roles.toSet()
-    }
-    handle { build() }
+    override fun toString(): String = "(authorize ${description})"
 }
-
-val RoleBasedAuthPlugin =
-    createRouteScopedPlugin(name = "RoleBasedAuthorization", createConfiguration = ::RoleBasedAuthConfiguration) {
-        with(pluginConfig) {
-            on(AuthenticationChecked) { call ->
-                val principal = call.principal<Principal>() ?: error("Missing principal")
-                val roles = roleBasedAuthPluginConfiguration?.roleExtractor?.invoke(principal)
-                    ?: error("RoleBasedAuthPlugin is not initialized,You can initialize it by calling 'installRoleBasedAuthPlugin()'")
-                val denyReasons = mutableListOf<String>()
-                all?.let {
-                    val missing = it - roles
-                    if (missing.isNotEmpty()) {
-                        denyReasons += "Principal $principal lacks required role(s) ${missing.joinToString(" and ")}"
-                    }
-                }
-                any?.let {
-                    if (it.none { it in roles }) {
-                        denyReasons += "Principal $principal has none of the sufficient role(s) ${
-                            it.joinToString(
-                                " or "
-                            )
-                        }"
-                    }
-                }
-                none?.let {
-                    if (it.any { it in roles }) {
-                        denyReasons += "Principal $principal has forbidden role(s) ${
-                            (it.intersect(roles)).joinToString(
-                                " and "
-                            )
-                        }"
-                    }
-                }
-                if (denyReasons.isNotEmpty()) {
-                    val message = denyReasons.joinToString(". ")
-                    println("Authorization failed for ${call.request.path()}. $message")
-                    call.respond(HttpStatusCode.Forbidden)
-                }
-            }
-        }
-    }
-
-private var roleBasedAuthPluginConfiguration: RoleBasedAuthPluginConfiguration? = null
-fun Application.installRoleBasedAuthPlugin(configuration: RoleBasedAuthPluginConfiguration.() -> Unit) {
-    roleBasedAuthPluginConfiguration = RoleBasedAuthPluginConfiguration().apply { configuration() }
-}
-
 
 class RoleBasedAuthPluginConfiguration {
-    var roleExtractor: ((Principal) -> Set<Role>)? = null
+    var roleExtractor: ((Principal) -> Set<Role>) = { emptySet() }
         private set
 
     fun extractRoles(extractor: (Principal) -> Set<Role>) {
         roleExtractor = extractor
     }
+    var throwErrorOnUnauthorizedResponse = false
 }
+
+private lateinit var pluginGlobalConfig: RoleBasedAuthPluginConfiguration
+fun AuthenticationConfig.roleBased(config:RoleBasedAuthPluginConfiguration.()->Unit){
+    pluginGlobalConfig = RoleBasedAuthPluginConfiguration().apply(config)
+}
+private fun Route.buildAuthorizedRoute(
+    requiredRoles: Set<Role>,
+    authType: AuthType,
+    build: Route.() -> Unit
+): Route {
+    val authorizedRoute = createChild(AuthorizedRouteSelector(requiredRoles.joinToString(",")))
+    authorizedRoute.install(RoleBasedAuthPlugin) {
+        this.requiredRoles = requiredRoles
+        this.authType = authType
+    }
+    authorizedRoute.build()
+    return authorizedRoute
+}
+fun Route.withRole(role: Role, build: Route.() -> Unit) =
+    buildAuthorizedRoute(requiredRoles = setOf(role),authType= AuthType.ALL, build = build)
+
+fun Route.withRoles(vararg roles: Role, build: Route.() -> Unit) =
+    buildAuthorizedRoute(requiredRoles = roles.toSet(),authType= AuthType.ALL, build = build)
+
+fun Route.withAnyRole(vararg roles: Role, build: Route.() -> Unit) =
+    buildAuthorizedRoute(requiredRoles = roles.toSet(),authType = AuthType.ANY, build = build)
+
+fun Route.withoutRoles(vararg roles: Role, build: Route.() -> Unit) =
+    buildAuthorizedRoute(requiredRoles = roles.toSet(), authType = AuthType.NONE,build = build)
+
+
+val RoleBasedAuthPlugin =
+    createRouteScopedPlugin(name = "RoleBasedAuthorization", createConfiguration = ::RoleBasedAuthConfiguration) {
+        if(::pluginGlobalConfig.isInitialized.not()){
+            error("RoleBasedAuthPlugin not initialized. Setup plugin by calling AuthenticationConfig#roleBased in authenticate block")
+        }
+        with(pluginConfig) {
+            on(AuthenticationChecked) { call ->
+                val principal = call.principal<Principal>() ?: return@on
+                    val userRoles = pluginGlobalConfig.roleExtractor.invoke(principal)
+                val denyReasons = mutableListOf<String>()
+
+                when(authType) {
+                    AuthType.ALL -> {
+                        val missing = requiredRoles - userRoles
+                        if (missing.isNotEmpty()) {
+                            denyReasons += "Principal lacks required role(s) ${missing.joinToString(" and ")}"
+                        }
+                    }
+                    AuthType.ANY -> {
+                        if (userRoles.none { it in requiredRoles }) {
+                            denyReasons += "Principal has none of the sufficient role(s) ${
+                                requiredRoles.joinToString(
+                                    " or "
+                                )
+                            }"
+                        }
+                    }
+                    AuthType.NONE -> {
+                        if (userRoles.any{ it in requiredRoles}) {
+                            denyReasons += "Principal has forbidden role(s) ${
+                                (requiredRoles.intersect(userRoles)).joinToString(
+                                    " and "
+                                )
+                            }"
+
+                        }
+                    }
+                }
+                if (denyReasons.isNotEmpty()) {
+                    if(pluginGlobalConfig.throwErrorOnUnauthorizedResponse){
+                        throw UnauthorizedAccessException(denyReasons)
+                    }else{
+                        val message = denyReasons.joinToString(". ")
+                        if(application.developmentMode){
+                            application.log.warn("Authorization failed for ${call.request.path()} $message")
+                        }
+                        call.respond(HttpStatusCode.Forbidden)
+                    }
+                }
+            }
+        }
+    }
+
+class UnauthorizedAccessException(val denyReasons: MutableList<String>) : Exception()
