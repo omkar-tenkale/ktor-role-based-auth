@@ -4,14 +4,18 @@
 # Ktor Role based Auth
 [![](https://jitpack.io/v/omkar-tenkale/ktor-role-based-auth.svg)](https://jitpack.io/#omkar-tenkale/ktor-role-based-auth)
 
-This library provides a Ktor plugin to handle role based authorization in ktor
+ktor-role-based-auth is an easy to use and intuitive role-based access control library for Ktor Server
 
+It works with the official [ktor-server-auth](https://ktor.io/docs/authentication.html) library and adds role based authorization on top of it
 
-## Features
-
-- minimal and fast
-- supports ktor 2.0.0+ unlike other similar plugins
-- supports JWT/Session or any custom mechanism to retrieve roles
+Supported methods
+- HTTP authentication (Basic/Digest/Bearer)
+- Form-based authentication
+- JWT
+- Session
+- OAuth
+- LDAP
+- Custom authentication
 
 
 ## Installation
@@ -28,41 +32,104 @@ Step 2. Add the dependency
 
 ```kotlin
 dependencies {
-    implementation("com.github.omkar-tenkale:ktor-role-based-auth:0.1.0")
+    implementation("com.github.omkar-tenkale:ktor-role-based-auth:0.2.0")
 }
 ```
 
 
 ## Usage
 
-Initialize when setting up application, tell the plugin how to extract roles from a principal
+Initialize the plugin when configuring authentication
 ```kotlin
-fun Application.module(){
-    installRoleBasedAuthPlugin{
-        extractRoles{ principal ->
-            //Return roles for this request
-            //For example in JWT authentication retrieve roles from jwt payload
-            (principal as JWTPrincipal).payload.claims?.get("roles")?.asList(String::class.java)?.toSet() ?: emptySet()
+fun Application.configureSecurity(){
+    authentication {
+        jwt {
+            // Configure jwt authentication
         }
-    }
-}
-```
-Then you can authorize any route like:
-```kotlin
-fun Application.routing() {
-    route("/posts/") {
-        method(HttpMethod.Get) {
-            call.respondText("Any user can access this route")
-        }
-        method(HttpMethod.Post) {
-            //Also available: withAllRoles(), withoutRoles() and withAnyRole()
-            withRole("admin") {
-                call.respondText("Only user with admin role can access this route, others will get a HTTP 403 (Forbidden) response")
+        roleBased {
+            extractRoles { principal ->
+                //Extract roles from JWT payload
+                (principal as JWTPrincipal).payload.claims?.get("roles")?.asList(String::class.java)?.toSet() ?: emptySet()
             }
         }
     }
 }
 ```
+
+```kotlin
+fun Application.routing() {
+    route("/") {
+        
+        //No authentication required to access this route
+        get {
+            call.respondText("Welcome!")
+        }
+
+        authenticate {
+
+            //JWT authenticated route
+            route("/profile") {
+                get {
+                    call.respondText("Joined: 2 years ago")
+                }
+            }
+
+            //JWT authenticated + role authorized route
+            route("/dashboard") {
+                withAnyRole("ADMIN", "SUPER_ADMIN") {
+                    get {
+                        call.respondText("Total users: 2443")
+                    }
+                }
+            }
+            
+            //JWT authenticated + role authorized route
+            route("/system-stats") {
+                withRole("SUPER_ADMIN") {
+                    get {
+                        call.respondText("CPU: 34%")
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+The plugin responds with `403 (Forbidden)` by default if roles don't match
+Optionally, follow these steps to send a custom response
+1. Set `throwErrorOnUnauthorizedResponse` to `true`
+```kotlin
+fun Application.configureSecurity(){
+    authentication {
+        jwt {
+            // Configure jwt authentication
+        }
+        roleBased {
+            extractRoles { principal ->
+                //Extract roles from JWT payload
+                (principal as JWTPrincipal).payload.claims?.get("roles")?.asList(String::class.java)?.toSet() ?: emptySet()
+            }
+            throwErrorOnUnauthorizedResponse = true
+        }
+    }
+}
+```
+2. Catch the `UnauthorizedAccessException` exception globally with help of [StatusPages plugin](https://ktor.io/docs/status-pages.html)
+```kotlin
+fun Application.configureSecurity() {
+    install(StatusPages) {
+        exception<Throwable> { call, cause ->
+            if (cause is UnauthorizedAccessException) {
+                call.respondText(text = "You don't have enough permissions to access this route", status = HttpStatusCode.Forbidden)
+            }
+        }
+    }
+}
+```
+
+
+For complete example, Check out [tests](src/test/kotlin/io/github/omkartenkale/ktor_role_based_aut/RoleBasedAuthPluginTest.kt)
 
 ## Thanks
 - [Joris Portegies Zwart](https://github.com/ximedes/ktor-authorization) - Original implementation with pipelines and phases for older ktor versions
