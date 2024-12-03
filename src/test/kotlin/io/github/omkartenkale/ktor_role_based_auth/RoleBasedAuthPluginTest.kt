@@ -51,8 +51,8 @@ internal class RoleBasedAuthPluginTest {
                             }
                         }
                     }
-                    roleBased {
-                        extractRoles { principal -> usersWithRoles[(principal as UserIdPrincipal).name]!! }
+                    roleBased<UserIdPrincipal> {
+                        extractRoles { principal -> usersWithRoles[principal.name]!! }
                         this.throwErrorOnUnauthorizedResponse = throwErrorOnUnauthorizedResponse
                     }
                 }
