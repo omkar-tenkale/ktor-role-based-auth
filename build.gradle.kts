@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.7.20"
+    kotlin("jvm") version "2.1.0"
     `maven-publish`
 }
 
@@ -13,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    val ktor_version = "2.2.1"
+    val ktor_version = "3.0.1"
     implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
     implementation("io.ktor:ktor-server-webjars:$ktor_version")
     implementation("io.ktor:ktor-server-auth:$ktor_version")
@@ -29,10 +29,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "1.8"
 }
 
 java {
